@@ -87,7 +87,7 @@
 
 # 5 ark-test-framework 框架接入方式
 
-```xml
+```java
 
 1.增加pom配置，注意scope是test。
 
@@ -107,11 +107,58 @@
    http://www.missfresh.cn/schema/layer http://www.missfresh.cn/schema/layer-mock.xsd
    http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
 
-
-
-    <context:component-scan base-package="com.ark.test" />
-    <context:exclude-filter type="annotation" expression="org.springframework.boot.autoconfigure.SpringBootApplication" />
-
+    <context:component-scan base-package="com.ark.test">
+      <context:exclude-filter type="annotation" expression="org.springframework.boot.autoconfigure.SpringBootApplication"/>
+    </context:component-scan>
+    <layer:layer-mock base-package="com.mryx.unified"/>
+    <!-- 如果系统中有使用@@Value("${xxx}")读取yml文件中的数据需要加下面配置 -->
+    <bean id="yamlProperties" class="org.springframework.beans.factory.config.YamlPropertiesFactoryBean">
+      <property name="resources" value="classpath:application.yml"/>
+    </bean>
+    <context:property-placeholder  properties-ref="yamlProperties" ignore-unresolvable="true"/>
+    
+    <!-- 如果系统中有使用@Value("${xxx}")读取properties文件需要加下面配置 -->
+    <context:property-placeholder  properties-ref="propertyConfigurer" ignore-unresolvable="true"/>
+    <bean id="propertyConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+      <property name="locations">
+        <value>classpath:xxx.properties</value>
+      </property>
+    </bean>
 <beans>
+
+
+  3. 增加测试的base基类
+      //加载spring mock配置文件
+      @ContextConfiguration("classpath:mock-test.xml")
+      //mock所有mybatis mapper文件
+      @LayerMockConfig( annotationMocks = {Mapper.class})
+      //加载指定的配置文件
+      @TestPropertySource(locations={"classpath:xxx.yml","classpath:xxx.properties"})
+      //激活dev环境
+      @ActiveProfiles(profiles = {"dev"})
+        public class LayerBaseMockTest {
+    
+      }
+  
+  
+  4. 增加测试框架启动控制台(创建到test下)
+    @SpringBootApplication()
+    public class TestApplication {
+  
+      public static void main(String[] args) {
+      ApplicationContext context = SpringApplication.run(Application.class, args);
+      LayerMockContainer.start(context);
+      }
+  
+    /**
+    * 配置录制controller
+    */
+    @Bean
+    public LayerTestRecordController layerRecordController(){
+      LayerTestRecordController recordController = new LayerTestRecordController("com.mryx.unified");
+      //自动生成代码的Test基类
+      recordController.setTemplateSuperClass(LayerBaseMockTest.class);
+      return recordController;
+    }
 
 ```
